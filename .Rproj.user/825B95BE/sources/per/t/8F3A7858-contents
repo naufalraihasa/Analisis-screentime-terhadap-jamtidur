@@ -1,0 +1,203 @@
+library(shiny)
+library(shinydashboard)
+library(shinythemes)
+library(dashboardthemes)
+library(ggplot2)
+library(viridis)
+
+
+ui <- dashboardPage(
+    skin = "blue",
+    dashboardHeader(title = "Marketing and Sales", titleWidth = 250),
+    dashboardSidebar(
+        width = 250,
+        sidebarMenu(
+            menuItem("Data", tabName = "data", icon = icon("fas fa-database")),
+            menuItem("Histogram", tabName = "histogram", icon = icon("fas fa-chart-bar")),
+            menuItem("Scatter Plot", tabName = "scatter", icon = icon("fas fa-project-diagram")),
+            menuItem("Boxplot", tabName = "boxplot", icon = icon("fas fa-th-large")),
+            menuItem("Sales Prediction", tabName = "regresi", icon = icon("fas fa-dollar-sign"))
+        )
+    ),
+    dashboardBody(
+        shinyDashboardThemes(theme = "purple_gradient"),
+        tabItems(
+            tabItem(tabName = "data",
+                    fluidPage(
+                      box(title = "Output Data", status = "primary", solidHeader = TRUE, width = 4,
+                          tableOutput("contents")),
+                      box(title = "Descriptive Statistics", status = "success", solidHeader = TRUE, width = 7,
+                          verbatimTextOutput("summary")
+                      )
+                    )),
+            
+            tabItem(tabName = "histogram",
+                    fluidRow(
+                      box(title = "Histogram Marketing and Sales Data", status = "success", solidHeader = TRUE, width = 12, 
+                          plotOutput("hist", height = 300))),
+                    fluidRow(box(status = "warning", solidHeader = FALSE, selectInput("var1", "Select Variable:",
+                                                                                     c("TV" = "TV",
+                                                                                       "Radio" = "Radio",
+                                                                                       "Social Media" = "SosMed",
+                                                                                       "Sales" = "Sales"))),
+                             box(status = "primary",
+                                 solidHeader = TRUE,
+                                 title = "Controls",
+                                 sliderInput(inputId = "bins",
+                                             label = "Number of bins:",
+                                             min = 1,
+                                             max = 50,
+                                             value = 30)
+                             ))
+            ),
+            
+            tabItem(tabName = "scatter",
+                    fluidRow(
+                      box(title = "Scatter Plot Marketing and Sales Data", 
+                          status = "success", solidHeader = TRUE, width = 7, plotOutput("scatterplot")),
+                      fluidRow(
+                        box(status = "warning", width = 5, solidHeader = FALSE, selectInput("var2", "Select X Variable:",
+                                                                                            c("TV" = "TV",
+                                                                                              "Radio" = "Radio",
+                                                                                              "Social Media" = "SosMed",
+                                                                                              "Sales" = "Sales"))),
+                        box(status = "warning", width = 5, solidHeader = FALSE, selectInput("var3", "Select Y Variable:",
+                                                                                            c("TV" = "TV",
+                                                                                              "Radio" = "Radio",
+                                                                                              "Social Media" = "SosMed",
+                                                                                              "Sales" = "Sales"))),
+                        box(title = "Controls", status = "primary", width = 5, solidHeader = TRUE,
+                            sliderInput("slider1", "Number of observations:", 1000, 4543, 3000)),
+                        infoBoxOutput("corcoef")
+                        )
+                      
+                    )),
+            tabItem(tabName = "boxplot",
+                    fluidRow(
+                      box(title = "Boxplot Marketing and Sales",
+                          status = "success", solidHeader = TRUE, width = 7, plotOutput("box")),
+                      fluidRow(
+                        box(status = "warning", width = 5, solidHeader = FALSE, selectInput(inputId = "var4",
+                                                                                           label = "Select Variable",
+                                                                                           c("TV",
+                                                                                             "Radio",
+                                                                                             "Social Media",
+                                                                                             "Sales"))),
+                        box(title = "Summary Variable", status = "primary", solidHeader = TRUE, width = 5,
+                            collapsible = TRUE, 
+                            verbatimTextOutput("summary1")
+                        ))
+                    )),
+            
+            tabItem(tabName = "regresi",
+                    fluidRow(
+                      box(status = "warning", solidHeader = FALSE,
+                          textInput("tv","enter the budget of TV marketing",""),
+                          textInput("radio","enter the the budget of radio marketing",""),
+                          textInput("sosmed","enter the the budget of social media marketing",""),
+                          actionButton('go',"Predict")),
+                      box(status = "warning", h2("Prediction of Sales Marketing is"), h3(textOutput("price")))
+                    )
+                    )
+                   
+        )
+    )
+)
+
+server <- function(input, output) {
+  df <- read.csv("datareg.csv")
+  
+  output$contents <- renderTable({
+    df <- read.csv("datareg.csv")
+    head(df)
+  })
+  
+  output$summary <- renderPrint({
+    summary(df)
+  })
+  
+  output$hist <- renderPlot({
+    datahist <- df[, input$var1, drop = FALSE]
+    datahist = unlist(datahist)
+    datahist = as.numeric(datahist)
+    ggplot(df, aes(datahist)) +
+      geom_histogram(alpha = 0.9, color = "black", fill = viridis(input$bins), bins = input$bins) +
+      labs(x=input$var1, y="Frequency") +
+      theme(axis.text = element_text(size=12, face="bold"),
+            axis.title = element_text(size=12, face="bold"))
+  })
+  
+  output$scatterplot <- renderPlot({
+    datascatter <- df[1:input$slider1, ]
+    scatterdata1 <- datascatter[, input$var2, drop = FALSE]
+    scatterdata1 = unlist(scatterdata1)
+    scatterdata1 = as.numeric(scatterdata1)
+    scatterdata2 <- datascatter[, input$var3, drop = FALSE]
+    scatterdata2 = unlist(scatterdata2)
+    scatterdata2 = as.numeric(scatterdata2)
+    ggplot(datascatter, aes(scatterdata1, scatterdata2)) +
+      labs(x=input$var2, y=input$var3) +
+      geom_point(aes(color = scatterdata1)) + 
+      scale_color_viridis(option = "D")+
+      theme_minimal() +
+      theme(legend.position = "bottom", legend.title = element_blank())
+  })
+  
+  output$corcoef <- renderInfoBox({
+    scatterdata1 <- df[, input$var2, drop = FALSE]
+    scatterdata1 = unlist(scatterdata1)
+    scatterdata1 = as.numeric(scatterdata1)
+    scatterdata2 <- df[, input$var3, drop = FALSE]
+    scatterdata2 = unlist(scatterdata2)
+    scatterdata2 = as.numeric(scatterdata2)
+    infoBox("Correlation Coefficient",
+            paste0(cor(scatterdata1, scatterdata2)),
+            icon = icon("fas fa-chart-line"),
+            color = "blue")
+  })
+  
+  
+  varInput <- reactive({
+    switch(input$var4,
+           "TV" = df$TV,
+           "Radio"= df$Radio,
+           "Social Media"= df$SosMed,
+           "Sales" = df$Sales)
+  })
+  output$box <- renderPlot({
+    ggplot(data=df, aes(y = varInput())) +
+      geom_boxplot(notch = TRUE,fill = "#660099", alpha=.7) +
+      labs(x=input$var4, y="value")+
+      theme(axis.text = element_text(size=12, face="bold"),
+            axis.title = element_text(size=15, face="bold"))
+    
+  })
+  
+  output$summary1 <- renderPrint({
+    summary(varInput())
+  })
+  
+  
+  
+  df2 = reactiveValues()
+  observeEvent(input$go,{
+    df2$btv <- as.numeric(input$tv)
+    df2$bradio <- as.numeric(input$radio)
+    df2$bsosmed <- as.numeric(input$sosmed)
+    
+    newPredict = data.frame(TV = df2$btv, 
+                            Radio = df2$bradio, 
+                            SosMed = df2$bsosmed)
+    
+    model = lm(Sales ~ TV+Radio+SosMed,
+               data = df) 
+    
+    df2$op = predict(model, newPredict)
+  })
+  
+  output$price <- renderPrint({df2$op})
+
+
+}
+
+shinyApp(ui, server)
